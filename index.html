@@ -1,0 +1,800 @@
+  <!DOCTYPE html>
+  <html lang="ko">
+  <head>
+  <meta charset="UTF-8">
+  <title>코드 연습 — All Chords</title>
+  <script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+  <style>
+    :root {
+      --bg: #1a1d23;
+      --panel: #252932;
+      --panel2: #2e333e;
+      --text: #e6e8ec;
+      --muted: #8b92a3;
+      --accent: #6aa9ff;
+      --accent2: #ffb86a;
+      --hi: #ff6b9d;
+      --ok: #6ae3b0;
+      --border: #3a404c;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0; padding: 20px;
+      font-family: -apple-system, 'Segoe UI', 'Malgun Gothic', sans-serif;
+      background: var(--bg); color: var(--text);
+    }
+    .app { max-width: 1600px; margin: 0 auto; }
+    h1 { margin: 0 0 4px; font-size: 20px; font-weight: 600; }
+    .sub { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+    .panel {
+      background: var(--panel); border: 1px solid var(--border);
+      border-radius: 8px; padding: 16px; margin-bottom: 14px;
+    }
+    .info {
+      display: flex; align-items: center; gap: 20px;
+      justify-content: space-between;
+    }
+    .info-left {
+      display: flex; align-items: center; gap: 14px;
+      flex: 1 1 auto; min-width: 0;
+    }
+    .info-right {
+      display: flex; align-items: center; gap: 10px;
+      flex: 0 0 auto;
+    }
+    .info .now {
+      font-size: 30px; font-weight: 700; color: var(--accent);
+      font-family: 'Consolas', monospace;
+      width: 220px;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .info .notes {
+      font-size: 16px; color: var(--accent2);
+      font-family: 'Consolas', monospace; letter-spacing: 2px;
+      flex: 1 1 auto; min-width: 0;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .volume-control {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 10px;
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .vol-icon { font-size: 16px; }
+    .vol-value {
+      color: var(--muted); font-size: 11px;
+      font-family: 'Consolas', monospace; min-width: 24px;
+      text-align: right;
+    }
+    #volume-slider {
+      width: 110px; height: 6px;
+      -webkit-appearance: none; appearance: none;
+      background: #1a1d23; border-radius: 3px;
+      outline: none; cursor: pointer;
+    }
+    #volume-slider::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid #0d1117;
+    }
+    #volume-slider::-moz-range-thumb {
+      width: 14px; height: 14px; border-radius: 50%;
+      background: var(--accent); cursor: pointer;
+      border: 2px solid #0d1117;
+    }
+    .master-btn {
+      flex: 0 0 auto;
+      background: linear-gradient(135deg, #ffb86a, #ff8a3c);
+      color: #2b1a05;
+      border: 1px solid #ffd58a; border-radius: 6px;
+      padding: 8px 18px; font-size: 13px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      transition: all 0.15s;
+      letter-spacing: 0.3px;
+    }
+    .master-btn:hover { filter: brightness(1.1); }
+    .master-btn:active { transform: scale(0.97); }
+    .master-btn.playing {
+      background: #ffd58a; color: #2b1a05;
+      animation: pulse-master 1s ease infinite alternate;
+    }
+    @keyframes pulse-master {
+      from { box-shadow: 0 0 0 0 rgba(255,184,106,0.6); }
+      to   { box-shadow: 0 0 0 10px rgba(255,184,106,0); }
+    }
+    .stop-btn {
+      flex: 0 0 auto;
+      width: 160px; text-align: center;
+      background: #4a2020; color: #ff9a9a;
+      border: 1px solid #7a3030; border-radius: 6px;
+      padding: 8px 16px; font-size: 13px; font-weight: 600;
+      cursor: pointer; font-family: inherit;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .stop-btn:hover { background: #7a3030; color: #fff; border-color: #ff6b6b; }
+    .stop-btn:active { transform: scale(0.97); }
+    .stop-btn.paused {
+      background: #1f3a1f; color: #9aff9a;
+      border-color: #307a30;
+    }
+    .stop-btn.paused:hover {
+      background: #307a30; color: #fff; border-color: #6bff6b;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 42px 50px repeat(17, minmax(60px, 1fr));
+      gap: 3px;
+      overflow-x: auto;
+    }
+    .grid-empty { background: transparent; }
+    .inv-btn {
+      background: #3a2038; color: #ffb3e5;
+      border: 1px solid #8a4a7a; border-radius: 6px;
+      padding: 6px 2px; font-size: 14px; font-weight: 700;
+      cursor: pointer; font-family: inherit;
+      display: flex; align-items: center; justify-content: center;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .inv-btn:hover { background: #5a3058; border-color: #ff6bcb; }
+    .inv-btn.playing {
+      background: rgba(255, 107, 203, 0.22);
+      color: #ffb3e5;
+      border-color: #ff6bcb;
+    }
+    .grid .head, .grid .row-head {
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 13px; color: var(--accent2);
+      padding: 8px 4px;
+      background: var(--panel2); border: 1px solid var(--border);
+      border-radius: 6px; cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+    }
+    .grid .head:hover, .grid .row-head:hover {
+      border-color: var(--accent2);
+      background: #3a3020;
+    }
+    .grid .head.playing, .grid .row-head.playing {
+      background: var(--accent2); color: #0d1117; border-color: var(--accent2);
+    }
+    .grid .row-head {
+      color: var(--accent); border-color: var(--border);
+      font-size: 15px; justify-content: center;
+    }
+    .grid .row-head:hover { border-color: var(--accent); background: #1f2a3a; }
+    .grid .row-head.playing { background: var(--accent); color: #0d1117; border-color: var(--accent); }
+    .grid .corner { background: transparent; border: none; cursor: default; }
+    .grid .corner:hover { background: transparent; border: none; }
+    .chord-btn {
+      background: var(--panel2); color: var(--text);
+      border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 2px; font-size: 12px; font-weight: 600;
+      font-family: inherit; cursor: pointer;
+      transition: transform 0.08s, background 0.15s, border-color 0.15s;
+      text-align: center; line-height: 1.1;
+      min-width: 0;
+    }
+    .chord-btn:hover {
+      border-color: var(--accent); transform: translateY(-1px);
+    }
+    .chord-btn.playing {
+      background: rgba(106, 169, 255, 0.22);
+      border-color: var(--accent);
+      color: var(--text);
+    }
+    .chord-btn.playing .suffix { color: var(--accent); }
+    .chord-btn .suffix { color: var(--muted); font-size: 10px; font-weight: 400; display: block; }
+    .chord-btn.playing .suffix { color: #0d1117; }
+    #piano-wrap { overflow-x: auto; padding: 4px 0; }
+    svg.piano { display: block; margin: 0 auto; }
+    .white-key { fill: #f4f5f7; stroke: #0d1117; stroke-width: 1; }
+    .black-key { fill: #1a1d23; stroke: #0d1117; stroke-width: 1; }
+    .white-key.hl-root, .black-key.hl-root { fill: var(--hi); }
+    .white-key.hl, .black-key.hl { fill: var(--accent); }
+    .white-key.arp, .black-key.arp { fill: var(--ok); }
+    .key-label {
+      font-family: 'Consolas', monospace; font-size: 10px;
+      text-anchor: middle; pointer-events: none;
+    }
+    .key-label.white { fill: #3a404c; }
+    .warn {
+      background: #3a2a1a; border: 1px solid var(--accent2);
+      color: var(--accent2); padding: 10px 14px; border-radius: 8px;
+      margin-bottom: 12px; font-size: 13px;
+    }
+  </style>
+  </head>
+  <body>
+  <div class="app">
+  <h1>🎹 모든 코드 연습</h1>
+  <div class="sub">
+    코드 버튼: <b>아르페지오 → 동시 재생</b>.
+    <b>루트명</b>(C, Db, …): 그 루트의 모든 퀄리티를 순차 재생.
+    <b>퀄리티명</b>(Major, minor, …): 그 퀄리티의 12키 순차 재생.
+    <b style="color:#ff9bd9">⟳ 버튼</b>: 같은 범위를 모든 전위(기본→1전위→…)까지 포함하여 재생.
+  </div>
+
+  <div id="audio-warn" class="warn" style="display:none">
+    ⚠ 페이지 아무 곳이나 한 번 클릭하면 오디오가 활성화됩니다.
+  </div>
+
+  <div class="panel">
+    <div class="info">
+      <div class="info-left">
+        <div class="now" id="now-name">—</div>
+        <div class="notes" id="now-notes"></div>
+      </div>
+      <div class="info-right">
+        <div class="volume-control">
+          <span class="vol-icon" id="vol-icon">🔊</span>
+          <input type="range" id="volume-slider" min="0" max="100" value="70">
+          <span class="vol-value" id="vol-value">70</span>
+        </div>
+        <button id="master-btn" class="master-btn">▶ MASTER 전체 재생</button>
+        <button id="stop-btn" class="stop-btn">⏸ 일시정지 (Space)</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div id="piano-wrap"></div>
+  </div>
+
+  <div class="panel">
+    <div class="grid" id="chord-grid"></div>
+  </div>
+
+  </div>
+
+  <script>
+  const ROOT_NAMES = ['C','Db','D','Eb','E','F','F#','G','Ab','A','Bb','B'];
+  const ROOT_SHARP = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+
+  const QUALITIES = [
+    { id: 'M',       label: 'Major',    suffix: '',       intervals: [0, 4, 7] },
+    { id: 'm',       label: 'minor',    suffix: 'm',      intervals: [0, 3, 7] },
+    { id: 'sus4',    label: 'sus4',     suffix: 'sus4',   intervals: [0, 5, 7] },
+    { id: 'dim',     label: 'dim',      suffix: '°',      intervals: [0, 3, 6] },
+    { id: 'aug',     label: 'aug',      suffix: '+',      intervals: [0, 4, 8] },
+    { id: '6',       label: '6',        suffix: '6',      intervals: [0, 4, 7, 9] },
+    { id: 'm6',      label: 'm6',       suffix: 'm6',     intervals: [0, 3, 7, 9] },
+    { id: 'maj7',    label: 'maj7',     suffix: 'maj7',   intervals: [0, 4, 7, 11] },
+    { id: 'm7',      label: 'm7',       suffix: 'm7',     intervals: [0, 3, 7, 10] },
+    { id: '7',       label: '7',        suffix: '7',      intervals: [0, 4, 7, 10] },
+    { id: '7sus4',   label: '7sus4',    suffix: '7sus4',  intervals: [0, 5, 7, 10] },
+    { id: 'm7b5',    label: 'm7♭5',     suffix: 'm7♭5',   intervals: [0, 3, 6, 10] },
+    { id: 'dim7',    label: 'dim7',     suffix: '°7',     intervals: [0, 3, 6, 9] },
+    { id: 'mMaj7',   label: 'mMaj7',    suffix: 'mMaj7',  intervals: [0, 3, 7, 11] },
+    { id: '7b5',     label: '7♭5',      suffix: '7♭5',    intervals: [0, 4, 6, 10] },
+    { id: 'aug7',    label: 'aug7',     suffix: '7♯5',    intervals: [0, 4, 8, 10] },
+    { id: 'augMaj7', label: 'augMaj7',  suffix: 'maj7♯5', intervals: [0, 4, 8, 11] }
+  ];
+
+  let synth = null;
+  let audioReady = false;
+  let synthLoading = false;
+
+  const PIANO_URLS = {
+    C3: 'C3.mp3', 'F#3': 'Fs3.mp3',
+    C4: 'C4.mp3', 'F#4': 'Fs4.mp3',
+    C5: 'C5.mp3', 'F#5': 'Fs5.mp3',
+    C6: 'C6.mp3'
+  };
+
+  async function createSynth() {
+    while (synthLoading) await new Promise(r => setTimeout(r, 30));
+    if (synth) return;
+    synthLoading = true;
+    synth = new Tone.Sampler({
+      urls: PIANO_URLS,
+      baseUrl: 'https://tonejs.github.io/audio/salamander/',
+      release: 1
+    }).toDestination();
+    await Tone.loaded();
+    synth.volume.value = -6;
+    synthLoading = false;
+  }
+
+  async function audioStart() {
+    if (Tone.context.state !== 'running') await Tone.start();
+    if (!synth && !synthLoading) {
+      const warn = document.getElementById('audio-warn');
+      warn.textContent = '🎹 피아노 샘플 로딩 중...';
+      warn.style.display = 'block';
+      await createSynth();
+      warn.style.display = 'none';
+    }
+    while (synthLoading) await new Promise(r => setTimeout(r, 30));
+    audioReady = Tone.context.state === 'running' && synth !== null;
+  }
+  document.addEventListener('pointerdown', () => {
+    if (Tone.context.state !== 'running') Tone.start();
+  }, { once: true });
+
+  function midiToToneNote(m) {
+    return ROOT_SHARP[m % 12] + (Math.floor(m / 12) - 1);
+  }
+
+  const PIANO_LOW = 48;
+  const PIANO_HIGH = 84;
+  const WHITE_W = 30;
+  const WHITE_H = 130;
+  const BLACK_W = 20;
+  const BLACK_H = 84;
+  const BLACK_PATTERN = [1, 3, 6, 8, 10];
+
+  function renderPiano() {
+    const wrap = document.getElementById('piano-wrap');
+    const whites = [];
+    const blacks = [];
+    for (let m = PIANO_LOW; m <= PIANO_HIGH; m++) {
+      if (BLACK_PATTERN.includes(m % 12)) blacks.push(m);
+      else whites.push(m);
+    }
+    const width = whites.length * WHITE_W + 2;
+    let svg = `<svg class="piano" width="${width}" height="${WHITE_H + 2}" viewBox="0 0 ${width} ${WHITE_H + 2}">`;
+    const whiteX = new Map();
+    whites.forEach((m, i) => {
+      const x = i * WHITE_W + 1;
+      whiteX.set(m, x);
+      svg += `<rect class="white-key" data-midi="${m}" x="${x}" y="1" width="${WHITE_W}" height="${WHITE_H}" rx="2"/>`;
+      if (m % 12 === 0) {
+        svg += `<text class="key-label white" x="${x + WHITE_W / 2}" y="${WHITE_H - 6}">C${Math.floor(m / 12) - 1}</text>`;
+      }
+    });
+    blacks.forEach(m => {
+      let prev = m - 1;
+      while (!whiteX.has(prev)) prev--;
+      const x = whiteX.get(prev) + WHITE_W - BLACK_W / 2;
+      svg += `<rect class="black-key" data-midi="${m}" x="${x}" y="1" width="${BLACK_W}" height="${BLACK_H}" rx="2"/>`;
+    });
+    svg += '</svg>';
+    wrap.innerHTML = svg;
+  }
+
+  function clearPianoHighlights() {
+    document.querySelectorAll('.piano rect').forEach(r => {
+      r.classList.remove('hl', 'hl-root', 'arp');
+    });
+  }
+  function highlightChordNotes(notes, rootPitchClass) {
+    clearPianoHighlights();
+    document.querySelectorAll('.piano rect').forEach(r => {
+      const m = parseInt(r.dataset.midi, 10);
+      if (notes.includes(m)) {
+        if (m % 12 === rootPitchClass) r.classList.add('hl-root');
+        else r.classList.add('hl');
+      }
+    });
+  }
+  function highlightArpStep(midi) {
+    document.querySelectorAll('.piano rect.arp').forEach(r => r.classList.remove('arp'));
+    const el = document.querySelector(`.piano rect[data-midi="${midi}"]`);
+    if (el) el.classList.add('arp');
+  }
+
+  function buildChordNotes(rootIdx, intervals) {
+    const rootMidi = 48 + rootIdx;
+    return intervals.map(i => rootMidi + i);
+  }
+
+  function renderGrid() {
+    const grid = document.getElementById('chord-grid');
+    grid.innerHTML = '';
+    grid.appendChild(Object.assign(document.createElement('div'), { className: 'grid-empty' }));
+    grid.appendChild(Object.assign(document.createElement('div'), { className: 'grid-empty' }));
+    QUALITIES.forEach(q => {
+      const b = document.createElement('button');
+      b.className = 'inv-btn inv-col-btn';
+      b.textContent = '⟳';
+      b.title = `${q.label} — 12키 × 모든 전위 순차 재생`;
+      b.dataset.q = q.id;
+      b.addEventListener('click', () => playColumnWithInversions(q));
+      grid.appendChild(b);
+    });
+    grid.appendChild(Object.assign(document.createElement('div'), { className: 'grid-empty' }));
+    grid.appendChild(Object.assign(document.createElement('div'), { className: 'grid-empty' }));
+    QUALITIES.forEach(q => {
+      const h = document.createElement('div');
+      h.className = 'head';
+      h.textContent = q.label;
+      h.title = `${q.label} — 12키 전체 순차 재생`;
+      h.dataset.q = q.id;
+      h.addEventListener('click', () => playColumn(q));
+      grid.appendChild(h);
+    });
+    ROOT_NAMES.forEach((root, rIdx) => {
+      const ir = document.createElement('button');
+      ir.className = 'inv-btn inv-row-btn';
+      ir.textContent = '⟳';
+      ir.title = `${root} — 모든 퀄리티 × 전위 순차 재생`;
+      ir.dataset.root = rIdx;
+      ir.addEventListener('click', () => playRowWithInversions(rIdx));
+      grid.appendChild(ir);
+
+      const rh = document.createElement('div');
+      rh.className = 'row-head';
+      rh.textContent = root;
+      rh.title = `${root} — 모든 퀄리티 순차 재생`;
+      rh.dataset.root = rIdx;
+      rh.addEventListener('click', () => playRow(rIdx));
+      grid.appendChild(rh);
+
+      QUALITIES.forEach(q => {
+        const b = document.createElement('button');
+        b.className = 'chord-btn';
+        const name = root + q.suffix;
+        b.innerHTML = `${root}<span class="suffix">${q.suffix || 'M'}</span>`;
+        b.title = name;
+        b.dataset.root = rIdx;
+        b.dataset.q = q.id;
+        b.addEventListener('click', () => {
+          clearHeaderHighlights();
+          playChord(rIdx, q, b, name);
+        });
+        grid.appendChild(b);
+      });
+    });
+  }
+
+  let playToken = 0;
+  const ARP_STEP = 0.32;
+  const ARP_NOTE_DUR = 0.4;
+  const GAP_DUR = 0.25;
+  const BLOCK_DUR = 1.4;
+
+  function setPhase(_text, _active) {}
+
+  let currentDoneResolve = null;
+
+  async function playChord(rootIdx, quality, btn, name, customNotes) {
+    await audioStart();
+    if (!audioReady) return;
+
+    const token = ++playToken;
+
+    if (currentDoneResolve) {
+      const r = currentDoneResolve;
+      currentDoneResolve = null;
+      r({ cancelled: true });
+    }
+
+    Tone.Transport.stop();
+    Tone.Transport.cancel();
+    Tone.Transport.position = 0;
+    synth.releaseAll();
+
+    document.querySelectorAll('.chord-btn.playing').forEach(b => {
+      if (b !== btn) b.classList.remove('playing');
+    });
+    btn.classList.add('playing');
+
+    const notes = customNotes || buildChordNotes(rootIdx, quality.intervals);
+    const toneNotes = notes.map(midiToToneNote);
+    const rootPitch = rootIdx;
+
+    document.getElementById('now-name').textContent = name;
+    document.getElementById('now-notes').textContent = notes.map(n => ROOT_NAMES[n % 12]).join(' · ');
+
+    notes.forEach((m, i) => {
+      const t = i * ARP_STEP;
+      Tone.Transport.scheduleOnce((time) => {
+        synth.triggerAttackRelease(midiToToneNote(m), ARP_NOTE_DUR, time);
+      }, t);
+    });
+
+    const blockOffset = notes.length * ARP_STEP + GAP_DUR;
+    Tone.Transport.scheduleOnce((time) => {
+      synth.triggerAttackRelease(toneNotes, BLOCK_DUR, time);
+    }, blockOffset);
+
+    const scheduleUI = (offsetSec, fn) => {
+      Tone.Transport.scheduleOnce((time) => {
+        if (token !== playToken) return;
+        Tone.Draw.schedule(fn, time);
+      }, offsetSec);
+    };
+
+    scheduleUI(0, () => {
+      highlightChordNotes(notes, rootPitch);
+    });
+    notes.forEach((m, i) => {
+      scheduleUI(i * ARP_STEP, () => highlightArpStep(m));
+    });
+    scheduleUI(blockOffset, () => {
+      document.querySelectorAll('.piano rect.arp').forEach(r => r.classList.remove('arp'));
+      highlightChordNotes(notes, rootPitch);
+    });
+
+    Tone.Transport.start('+0.05');
+    updatePauseButton();
+
+    const totalOffset = blockOffset + BLOCK_DUR + 0.2;
+
+    return new Promise(resolve => {
+      currentDoneResolve = resolve;
+      const myResolve = resolve;
+      Tone.Transport.scheduleOnce((time) => {
+        if (currentDoneResolve !== myResolve) return;
+        currentDoneResolve = null;
+        const cancelled = token !== playToken;
+        if (!cancelled) {
+          Tone.Draw.schedule(() => {
+            document.querySelectorAll('.piano rect.arp').forEach(r => r.classList.remove('arp'));
+          }, time);
+        }
+        resolve({ cancelled });
+      }, totalOffset);
+    });
+  }
+
+  function clearHeaderHighlights() {
+    document.querySelectorAll('.grid .head.playing, .grid .row-head.playing, .grid .inv-btn.playing')
+      .forEach(el => el.classList.remove('playing'));
+  }
+
+  function clearChordHighlights() {
+    document.querySelectorAll('.chord-btn.playing').forEach(b => b.classList.remove('playing'));
+  }
+
+  function invertNotes(notes, inv) {
+    const arr = [...notes];
+    for (let i = 0; i < inv; i++) arr[i] += 12;
+    return arr.sort((a, b) => a - b);
+  }
+
+  const INV_LABELS = ['기본', '1전위', '2전위', '3전위'];
+
+  async function playChordInversions(rootIdx, quality, btn, baseName) {
+    const base = buildChordNotes(rootIdx, quality.intervals);
+    const invCount = base.length;
+    let expected = playToken;
+    for (let inv = 0; inv < invCount; inv++) {
+      const notes = invertNotes(base, inv);
+      const name = `${baseName} ${INV_LABELS[inv]}`;
+      if (playToken !== expected) return { cancelled: true };
+      const res = await playChord(rootIdx, quality, btn, name, notes);
+      expected = playToken;
+      if (!res || res.cancelled) return { cancelled: true };
+    }
+    return { cancelled: false };
+  }
+
+  async function playColumnWithInversions(quality) {
+    await audioStart();
+    if (!audioReady) return;
+    clearHeaderHighlights();
+    const invBtn = document.querySelector(`.inv-col-btn[data-q="${quality.id}"]`);
+    if (invBtn) invBtn.classList.add('playing');
+    const seqToken = ++playToken;
+    let expected = seqToken;
+    try {
+      for (let rIdx = 0; rIdx < 12; rIdx++) {
+        const name = ROOT_NAMES[rIdx] + quality.suffix;
+        const btn = document.querySelector(
+          `.chord-btn[data-root="${rIdx}"][data-q="${quality.id}"]`
+        );
+        if (!btn) continue;
+        if (playToken !== expected) return;
+        const res = await playChordInversions(rIdx, quality, btn, name);
+        expected = playToken;
+        if (!res || res.cancelled) return;
+      }
+    } finally {
+      if (playToken === expected) {
+        if (invBtn) invBtn.classList.remove('playing');
+        clearChordHighlights();
+      }
+    }
+  }
+
+  async function playRowWithInversions(rootIdx) {
+    await audioStart();
+    if (!audioReady) return;
+    clearHeaderHighlights();
+    const invBtn = document.querySelector(`.inv-row-btn[data-root="${rootIdx}"]`);
+    if (invBtn) invBtn.classList.add('playing');
+    const seqToken = ++playToken;
+    let expected = seqToken;
+    try {
+      for (const q of QUALITIES) {
+        const name = ROOT_NAMES[rootIdx] + q.suffix;
+        const btn = document.querySelector(
+          `.chord-btn[data-root="${rootIdx}"][data-q="${q.id}"]`
+        );
+        if (!btn) continue;
+        if (playToken !== expected) return;
+        const res = await playChordInversions(rootIdx, q, btn, name);
+        expected = playToken;
+        if (!res || res.cancelled) return;
+      }
+    } finally {
+      if (playToken === expected) {
+        if (invBtn) invBtn.classList.remove('playing');
+        clearChordHighlights();
+      }
+    }
+  }
+
+  async function playColumn(quality) {
+    await audioStart();
+    if (!audioReady) return;
+    clearHeaderHighlights();
+    const header = document.querySelector(`.grid .head[data-q="${quality.id}"]`);
+    if (header) header.classList.add('playing');
+
+    const seqToken = ++playToken;
+    let expected = seqToken;
+    try {
+      for (let rIdx = 0; rIdx < 12; rIdx++) {
+        const name = ROOT_NAMES[rIdx] + quality.suffix;
+        const btn = document.querySelector(
+          `.chord-btn[data-root="${rIdx}"][data-q="${quality.id}"]`
+        );
+        if (!btn) continue;
+        if (playToken !== expected) return;
+        const res = await playChord(rIdx, quality, btn, name);
+        expected = playToken;
+        if (!res || res.cancelled) return;
+      }
+    } finally {
+      if (playToken === expected) {
+        if (header) header.classList.remove('playing');
+        clearChordHighlights();
+      }
+    }
+  }
+
+  async function playRow(rootIdx) {
+    await audioStart();
+    if (!audioReady) return;
+    clearHeaderHighlights();
+    const header = document.querySelector(`.grid .row-head[data-root="${rootIdx}"]`);
+    if (header) header.classList.add('playing');
+
+    const seqToken = ++playToken;
+    let expected = seqToken;
+    try {
+      for (const q of QUALITIES) {
+        const name = ROOT_NAMES[rootIdx] + q.suffix;
+        const btn = document.querySelector(
+          `.chord-btn[data-root="${rootIdx}"][data-q="${q.id}"]`
+        );
+        if (!btn) continue;
+        if (playToken !== expected) return;
+        const res = await playChord(rootIdx, q, btn, name);
+        expected = playToken;
+        if (!res || res.cancelled) return;
+      }
+    } finally {
+      if (playToken === expected) {
+        if (header) header.classList.remove('playing');
+        clearChordHighlights();
+      }
+    }
+  }
+
+  async function playMaster() {
+    await audioStart();
+    if (!audioReady) return;
+    clearHeaderHighlights();
+    const masterBtn = document.getElementById('master-btn');
+    if (masterBtn) masterBtn.classList.add('playing');
+    const seqToken = ++playToken;
+    let expected = seqToken;
+    try {
+      for (let rIdx = 0; rIdx < 12; rIdx++) {
+        for (const q of QUALITIES) {
+          const name = ROOT_NAMES[rIdx] + q.suffix;
+          const btn = document.querySelector(
+            `.chord-btn[data-root="${rIdx}"][data-q="${q.id}"]`
+          );
+          if (!btn) continue;
+          if (playToken !== expected) return;
+          const res = await playChordInversions(rIdx, q, btn, name);
+          expected = playToken;
+          if (!res || res.cancelled) return;
+        }
+      }
+    } finally {
+      if (masterBtn) masterBtn.classList.remove('playing');
+      if (playToken === expected) clearChordHighlights();
+    }
+  }
+
+  function updatePauseButton() {
+    const btn = document.getElementById('stop-btn');
+    if (!btn) return;
+    const paused = Tone.Transport.state === 'paused';
+    if (paused) {
+      btn.textContent = '▶ 재개 (Space)';
+      btn.classList.add('paused');
+    } else {
+      btn.textContent = '⏸ 일시정지 (Space)';
+      btn.classList.remove('paused');
+    }
+  }
+
+  function togglePause() {
+    const state = Tone.Transport.state;
+    if (state === 'started') {
+      Tone.Transport.pause();
+      if (synth) {
+        try { synth.releaseAll(); } catch (_) {}
+      }
+    } else if (state === 'paused') {
+      Tone.Transport.start();
+    }
+    updatePauseButton();
+  }
+
+  function stopAll() {
+    ++playToken;
+    if (currentDoneResolve) {
+      const r = currentDoneResolve;
+      currentDoneResolve = null;
+      r({ cancelled: true });
+    }
+    try { Tone.Transport.stop(); } catch (_) {}
+    try { Tone.Transport.cancel(); } catch (_) {}
+    Tone.Transport.position = 0;
+    if (synth) {
+      try { synth.releaseAll(); } catch (_) {}
+    }
+    document.querySelectorAll('.chord-btn.playing').forEach(b => b.classList.remove('playing'));
+    document.querySelectorAll('.grid .head.playing, .grid .row-head.playing, .grid .inv-btn.playing')
+      .forEach(el => el.classList.remove('playing'));
+    document.querySelectorAll('.piano rect').forEach(r => {
+      r.classList.remove('hl', 'hl-root', 'arp');
+    });
+    updatePauseButton();
+  }
+
+  renderPiano();
+  renderGrid();
+  document.getElementById('audio-warn').style.display = 'block';
+
+  function sliderToDb(v) {
+    if (v <= 0) return -Infinity;
+    return 20 * Math.log10(v / 100);
+  }
+  function applyVolume(v) {
+    Tone.Destination.volume.value = sliderToDb(v);
+    const icon = document.getElementById('vol-icon');
+    const label = document.getElementById('vol-value');
+    if (label) label.textContent = v;
+    if (icon) {
+      if (v <= 0) icon.textContent = '🔇';
+      else if (v < 30) icon.textContent = '🔈';
+      else if (v < 70) icon.textContent = '🔉';
+      else icon.textContent = '🔊';
+    }
+    try { localStorage.setItem('chordex:volume', String(v)); } catch (_) {}
+  }
+  const savedVol = (() => {
+    try { return parseInt(localStorage.getItem('chordex:volume'), 10); } catch (_) { return NaN; }
+  })();
+  const initialVol = Number.isFinite(savedVol) ? Math.max(0, Math.min(100, savedVol)) : 70;
+  const volSlider = document.getElementById('volume-slider');
+  volSlider.value = initialVol;
+  applyVolume(initialVol);
+  volSlider.addEventListener('input', (e) => {
+    applyVolume(parseInt(e.target.value, 10));
+  });
+
+  document.getElementById('master-btn').addEventListener('click', playMaster);
+  document.getElementById('stop-btn').addEventListener('click', togglePause);
+  document.addEventListener('keydown', (e) => {
+    const tag = (e.target && e.target.tagName) || '';
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+    if (e.code === 'Space') {
+      e.preventDefault();
+      togglePause();
+    } else if (e.code === 'Escape') {
+      e.preventDefault();
+      stopAll();
+    }
+  });
+  </script>
+  </body>
+  </html>
